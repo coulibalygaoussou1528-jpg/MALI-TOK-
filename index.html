@@ -82,7 +82,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--y);outline-offs
 var sb=supabase.createClient("https://hcltfvxyglnfvivzazzy.supabase.co","sb_publishable_PDIeGRRwoe-9vKUvHEe4jQ_wb4LSKE9");
 var $=function(i){return document.getElementById(i)};
 var me=null,muted=true,mode="c",cur=null,pend=null,signup=false,feed=$("feed");
-var ico={h:'<svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-9.6-9.4A5.6 5.6 0 0 1 12 6.2a5.6 5.6 0 0 1 9.6 5.4C19.5 16.4 12 21 12 21z"/></svg>',c:'<svg viewBox="0 0 24 24"><path d="M4 5h16v11H10l-5 4v-4H4z"/></svg>',s:'<svg viewBox="0 0 24 24"><path d="M4 13v7h16v-7M12 3v12M7 8l5-5 5 5"/></svg>'};
+var ico={h:'<svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-9.6-9.4A5.6 5.6 0 0 1 12 6.2a5.6 5.6 0 0 1 9.6 5.4C19.5 16.4 12 21 12 21z"/></svg>',c:'<svg viewBox="0 0 24 24"><path d="M4 5h16v11H10l-5 4v-4H4z"/></svg>',s:'<svg viewBox="0 0 24 24"><path d="M4 13v7h16v-7M12 3v12M7 8l5-5 5 5"/></svg>',m:'<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>'};
 function toast(m){var t=$("toast");t.textContent=m;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(function(){t.classList.remove("show")},2200)}
 function name(){return (me&&me.user_metadata&&me.user_metadata.username)||"ami"}
 function fr(m){if(/Invalid login/i.test(m))return"Numéro, e-mail ou mot de passe incorrect.";if(/already registered/i.test(m))return"Ce numéro ou cet e-mail a déjà un compte. Connecte-toi.";if(/rate limit/i.test(m))return"Trop d’essais. Réessaie dans quelques minutes.";return m}
@@ -100,6 +100,7 @@ var io=new IntersectionObserver(function(es){es.forEach(function(e){var v=e.targ
 async function load(){
  var r=await sb.from("posts").select("*").order("created_at",{ascending:false}).limit(30);
  if(r.error){toast("Chargement impossible");return}
+ var B=(await sb.from("blocks").select("blocked_id")).data||[];r.data=r.data.filter(function(p){return !B.some(function(b){return b.blocked_id===p.user_id})});
  var ids=r.data.map(function(p){return p.id}),L=[],C=[];
  if(ids.length){L=(await sb.from("likes").select("post_id,user_id").in("post_id",ids)).data||[];C=(await sb.from("comments").select("post_id").in("post_id",ids)).data||[]}
  feed.innerHTML="";io.disconnect();
@@ -119,8 +120,8 @@ function mk(p){
   var x=await q;if(x.error){p.liked=was;p.likes+=was?1:-1;draw();toast("Action impossible")}};
  cb.onclick=function(){open("c",p,draw)};
  sb2.onclick=function(){var data={title:"MALI TOK",text:p.caption||"Regarde cette vidéo sur MALI TOK",url:location.href};if(navigator.share){navigator.share(data).catch(function(){})}else{try{navigator.clipboard.writeText(location.href).then(function(){toast("Lien copié")})}catch(e){toast("Copie impossible")}}};
- r.appendChild(lb);r.appendChild(cb);r.appendChild(sb2);d.appendChild(r);io.observe(d);return d}
-function open(m,p,draw){mode=m;cur={p:p,draw:draw};$("inp").value="";$("sheet").classList.add("open");document.querySelector(".add-c").style.display=m==="n"?"none":"flex";if(m==="n"){$("ttl").textContent="Notifications";notifs();return}
+ var mb=document.createElement("button");mb.setAttribute("aria-label","Plus d’options");mb.innerHTML=ico.m+"<span>Plus</span>";mb.onclick=function(){open("m",p,null)};r.appendChild(lb);r.appendChild(cb);r.appendChild(sb2);r.appendChild(mb);d.appendChild(r);io.observe(d);return d}
+function open(m,p,draw){mode=m;cur={p:p,draw:draw};$("inp").value="";$("sheet").classList.add("open");document.querySelector(".add-c").style.display=(m==="c"||m==="p")?"flex":"none";if(m==="n"){$("ttl").textContent="Notifications";notifs();return}if(m==="m"){menu(p);return}if(m==="u"){profile();return}
  if(m==="c"){$("ttl").textContent="Commentaires";$("inp").placeholder="Ajoute un commentaire…";$("send").textContent="Envoyer";comments()}
  else{$("ttl").textContent="Nouvelle vidéo";$("inp").placeholder="Écris une légende (facultatif)";$("send").textContent="Publier";$("list").textContent="Vidéo choisie : "+pend.name+" ("+(pend.size/1048576).toFixed(1)+" Mo)"}}
 async function comments(){var l=$("list");l.textContent="Chargement…";var r=await sb.from("comments").select("username,body").eq("post_id",cur.p.id).order("created_at");
@@ -152,7 +153,20 @@ $("send").onclick=async function(){var t=$("inp").value.trim(),b=this;
 $("inp").addEventListener("keydown",function(e){if(e.key==="Enter")$("send").click()});
 $("snd").onclick=function(){muted=!muted;this.textContent=muted?"Son coupé":"Son activé";feed.querySelectorAll("video").forEach(function(v){v.muted=muted})};
 $("home").onclick=function(){load();feed.scrollTo({top:0,behavior:"smooth"})};
-$("me").onclick=function(){if(confirm("Connecté en tant que "+name()+". Se déconnecter ?"))sb.auth.signOut()};
+$("me").onclick=function(){open("u",null,null)};
+function btn(label,fn,danger){var b=document.createElement("button");b.textContent=label;b.style.cssText="display:block;width:100%;text-align:left;background:#262626;border:0;border-radius:10px;color:"+(danger?"#ff7b7b":"#fff")+";font-size:16px;padding:14px;margin-bottom:10px;cursor:pointer";b.onclick=fn;$("list").appendChild(b)}
+function menu(p){$("ttl").textContent="Options";$("list").innerHTML="";
+ if(p.user_id===me.id){btn("Supprimer ma vidéo",function(){delPost(p)},true)}
+ else{btn("Signaler cette vidéo",function(){reportMenu(p)});btn("Bloquer @"+p.username,function(){block(p)},true)}}
+function reportMenu(p){$("ttl").textContent="Pourquoi signaler ?";$("list").innerHTML="";
+ ["Contenu violent ou choquant","Contenu sexuel ou inapproprié","Harcèlement ou haine","Spam ou arnaque","Autre"].forEach(function(t){btn(t,async function(){var r=await sb.from("reports").insert({post_id:p.id,reason:t});$("sheet").classList.remove("open");toast(r.error?"Signalement impossible":"Merci, nous allons examiner cette vidéo")})})}
+async function block(p){if(!confirm("Bloquer @"+p.username+" ? Tu ne verras plus ses vidéos."))return;var r=await sb.from("blocks").insert({blocked_id:p.user_id});$("sheet").classList.remove("open");if(r.error){toast("Blocage impossible");return}toast("Utilisateur bloqué");load()}
+async function delPost(p){if(!confirm("Supprimer cette vidéo définitivement ?"))return;var r=await sb.from("posts").delete().eq("id",p.id);$("sheet").classList.remove("open");if(r.error){toast("Suppression impossible");return}
+ try{var i=p.video_url.indexOf("/videos/");if(i>-1)await sb.storage.from("videos").remove([decodeURIComponent(p.video_url.slice(i+8))])}catch(e){}
+ toast("Vidéo supprimée");load()}
+function profile(){$("ttl").textContent="Mon compte";$("list").innerHTML="";var t=document.createElement("div");t.style.cssText="margin-bottom:14px;color:#c9c9c9";t.textContent="Connecté en tant que @"+name();$("list").appendChild(t);
+ btn("Se déconnecter",function(){sb.auth.signOut();$("sheet").classList.remove("open")});
+ btn("Supprimer mon compte",async function(){if(!confirm("Supprimer définitivement ton compte, tes vidéos, tes likes et tes commentaires ?"))return;var r=await sb.rpc("delete_my_account");if(r.error){toast("Suppression impossible");return}$("sheet").classList.remove("open");await sb.auth.signOut();toast("Compte supprimé")},true)}
 $("add").onclick=function(){$("file").click()};
 $("file").onchange=function(){var f=this.files[0];this.value="";if(!f)return;
  if(f.type&&f.type.indexOf("video")!==0){toast("Choisis un fichier vidéo");return}
