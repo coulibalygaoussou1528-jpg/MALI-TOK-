@@ -50,10 +50,16 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--y);outline-offs
 .rt{display:flex;gap:8px;pointer-events:auto}
 .snd{position:relative}
 .bn{position:absolute;top:-5px;right:-5px;min-width:17px;height:17px;border-radius:9px;background:var(--r);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px}
+.tabs{position:absolute;top:52px;left:0;right:0;display:flex;justify-content:center;gap:22px;z-index:5}
+.tabs button{background:none;border:0;color:#d0d0d0;font-size:15px;font-weight:600;padding:6px 4px;cursor:pointer;text-shadow:0 1px 6px rgba(0,0,0,.8);border-bottom:2px solid transparent}
+.tabs .on{color:#fff;border-bottom-color:var(--y)}
+.fb{margin-left:8px;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.6);border-radius:6px;color:#fff;font-size:12px;padding:2px 8px;cursor:pointer;vertical-align:middle}
+.fb.on{background:none;opacity:.8}
 </style></head>
 <body>
 <div class="stage">
   <div class="top"><div class="logo"><i>MALI</i><em></em><u>TOK</u></div><div class="rt"><button class="snd" id="bell" aria-label="Notifications">🔔<span class="bn" id="bn" style="display:none">0</span></button><button class="snd" id="snd">Son coupé</button></div></div>
+  <div class="tabs"><button id="t1" class="on">Pour toi</button><button id="t2">Abonnements</button></div>
   <div class="feed" id="feed"></div>
   <div class="auth" id="auth">
     <div class="logo"><i>MALI</i><em></em><u>TOK</u></div>
@@ -81,7 +87,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--y);outline-offs
 <script>
 var sb=supabase.createClient("https://hcltfvxyglnfvivzazzy.supabase.co","sb_publishable_PDIeGRRwoe-9vKUvHEe4jQ_wb4LSKE9");
 var $=function(i){return document.getElementById(i)};
-var me=null,muted=true,mode="c",cur=null,pend=null,signup=false,feed=$("feed");
+var me=null,muted=true,mode="c",cur=null,pend=null,signup=false,tab="all",follows=new Set(),feed=$("feed");
 var ico={h:'<svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-9.6-9.4A5.6 5.6 0 0 1 12 6.2a5.6 5.6 0 0 1 9.6 5.4C19.5 16.4 12 21 12 21z"/></svg>',c:'<svg viewBox="0 0 24 24"><path d="M4 5h16v11H10l-5 4v-4H4z"/></svg>',s:'<svg viewBox="0 0 24 24"><path d="M4 13v7h16v-7M12 3v12M7 8l5-5 5 5"/></svg>',m:'<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>'};
 function toast(m){var t=$("toast");t.textContent=m;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(function(){t.classList.remove("show")},2200)}
 function name(){return (me&&me.user_metadata&&me.user_metadata.username)||"ami"}
@@ -101,15 +107,16 @@ async function load(){
  var r=await sb.from("posts").select("*").order("created_at",{ascending:false}).limit(30);
  if(r.error){toast("Chargement impossible");return}
  var B=(await sb.from("blocks").select("blocked_id")).data||[];r.data=r.data.filter(function(p){return !B.some(function(b){return b.blocked_id===p.user_id})});
+ var F=(await sb.from("follows").select("followed_id")).data||[];follows=new Set(F.map(function(x){return x.followed_id}));if(tab==="sub")r.data=r.data.filter(function(p){return follows.has(p.user_id)});
  var ids=r.data.map(function(p){return p.id}),L=[],C=[];
  if(ids.length){L=(await sb.from("likes").select("post_id,user_id").in("post_id",ids)).data||[];C=(await sb.from("comments").select("post_id").in("post_id",ids)).data||[]}
  feed.innerHTML="";io.disconnect();
- if(!r.data.length){var n=document.createElement("div");n.className="none";n.textContent="Aucune vidéo pour l’instant. Publie la première avec le bouton +.";feed.appendChild(n);return}
- r.data.forEach(function(p){p.likes=L.filter(function(x){return x.post_id==p.id}).length;p.liked=L.some(function(x){return x.post_id==p.id&&x.user_id==me.id});p.nc=C.filter(function(x){return x.post_id==p.id}).length;feed.appendChild(mk(p))})}
+ if(!r.data.length){var n=document.createElement("div");n.className="none";n.textContent=tab==="sub"?"Abonne-toi à des comptes avec le bouton « S’abonner » pour voir leurs vidéos ici.":"Aucune vidéo pour l’instant. Publie la première avec le bouton +.";feed.appendChild(n);return}
+ r.data.forEach(function(p){p.likes=L.filter(function(x){return x.post_id==p.id}).length;p.liked=L.some(function(x){return x.post_id==p.id&&x.user_id==me.id});p.nc=C.filter(function(x){return x.post_id==p.id}).length;feed.appendChild(mk(p))});fbUpdate()}
 function mk(p){
  var d=document.createElement("div");d.className="post";
  var v=document.createElement("video");v.className="bg";v.src=p.video_url;v.loop=true;v.playsInline=true;v.muted=true;v.preload="metadata";v.onclick=function(){v.paused?v.play():v.pause()};d.appendChild(v);
- var i=document.createElement("div");i.className="info";var u=document.createElement("b");u.textContent="@"+p.username;var c=document.createElement("span");c.textContent=p.caption||"";i.appendChild(u);i.appendChild(c);d.appendChild(i);
+ var i=document.createElement("div");i.className="info";var u=document.createElement("b");u.textContent="@"+p.username;if(p.user_id!==me.id){var fb=document.createElement("button");fb.className="fb";fb.dataset.u=p.user_id;fb.onclick=function(){toggleFollow(p.user_id,p.username)};u.appendChild(fb)}var c=document.createElement("span");c.textContent=p.caption||"";i.appendChild(u);i.appendChild(c);d.appendChild(i);
  var r=document.createElement("div");r.className="rail";
  var lb=document.createElement("button"),cb=document.createElement("button"),sb2=document.createElement("button");
  lb.setAttribute("aria-label","J’aime");cb.setAttribute("aria-label","Commentaires");sb2.setAttribute("aria-label","Partager");
@@ -133,7 +140,7 @@ async function badge(){if(!me)return;var r=await sb.from("notifications").select
 async function notifs(){var l=$("list");l.textContent="Chargement…";var r=await sb.from("notifications").select("actor_name,kind,body,read").order("created_at",{ascending:false}).limit(30);
  if(r.error){l.textContent="Chargement impossible.";return}
  l.innerHTML="";if(!r.data.length){l.textContent="Aucune notification pour l’instant.";return}
- r.data.forEach(function(k){var x=document.createElement("div");x.className="c";var b=document.createElement("b");b.textContent=(k.read?"":"● ")+"@"+k.actor_name+" ";x.appendChild(b);x.appendChild(document.createTextNode(k.kind==="like"?"a aimé ta vidéo":"a commenté : "+(k.body||"")));l.appendChild(x)});
+ r.data.forEach(function(k){var x=document.createElement("div");x.className="c";var b=document.createElement("b");b.textContent=(k.read?"":"● ")+"@"+k.actor_name+" ";x.appendChild(b);x.appendChild(document.createTextNode(k.kind==="like"?"a aimé ta vidéo":k.kind==="follow"?"s’est abonné à toi":"a commenté : "+(k.body||"")));l.appendChild(x)});
  await sb.from("notifications").update({read:true}).eq("read",false);badge()}
 $("bell").onclick=function(){open("n",null,null)};
 setInterval(badge,30000);
@@ -154,6 +161,12 @@ $("inp").addEventListener("keydown",function(e){if(e.key==="Enter")$("send").cli
 $("snd").onclick=function(){muted=!muted;this.textContent=muted?"Son coupé":"Son activé";feed.querySelectorAll("video").forEach(function(v){v.muted=muted})};
 $("home").onclick=function(){load();feed.scrollTo({top:0,behavior:"smooth"})};
 $("me").onclick=function(){open("u",null,null)};
+function fbUpdate(){document.querySelectorAll(".fb").forEach(function(b){var f=follows.has(b.dataset.u);b.textContent=f?"Abonné":"S’abonner";b.className=f?"fb on":"fb"})}
+async function toggleFollow(id,nm){var was=follows.has(id);if(was)follows.delete(id);else follows.add(id);fbUpdate();
+ var r=was?await sb.from("follows").delete().match({follower_id:me.id,followed_id:id}):await sb.from("follows").insert({followed_id:id});
+ if(r.error){if(was)follows.add(id);else follows.delete(id);fbUpdate();toast("Action impossible")}else if(!was)toast("Tu es abonné à @"+nm)}
+$("t1").onclick=function(){tab="all";$("t1").className="on";$("t2").className="";load();feed.scrollTo({top:0})};
+$("t2").onclick=function(){tab="sub";$("t2").className="on";$("t1").className="";load();feed.scrollTo({top:0})};
 function btn(label,fn,danger){var b=document.createElement("button");b.textContent=label;b.style.cssText="display:block;width:100%;text-align:left;background:#262626;border:0;border-radius:10px;color:"+(danger?"#ff7b7b":"#fff")+";font-size:16px;padding:14px;margin-bottom:10px;cursor:pointer";b.onclick=fn;$("list").appendChild(b)}
 function menu(p){$("ttl").textContent="Options";$("list").innerHTML="";
  if(p.user_id===me.id){btn("Supprimer ma vidéo",function(){delPost(p)},true)}
@@ -164,7 +177,7 @@ async function block(p){if(!confirm("Bloquer @"+p.username+" ? Tu ne verras plus
 async function delPost(p){if(!confirm("Supprimer cette vidéo définitivement ?"))return;var r=await sb.from("posts").delete().eq("id",p.id);$("sheet").classList.remove("open");if(r.error){toast("Suppression impossible");return}
  try{var i=p.video_url.indexOf("/videos/");if(i>-1)await sb.storage.from("videos").remove([decodeURIComponent(p.video_url.slice(i+8))])}catch(e){}
  toast("Vidéo supprimée");load()}
-function profile(){$("ttl").textContent="Mon compte";$("list").innerHTML="";var t=document.createElement("div");t.style.cssText="margin-bottom:14px;color:#c9c9c9";t.textContent="Connecté en tant que @"+name();$("list").appendChild(t);
+function profile(){$("ttl").textContent="Mon compte";$("list").innerHTML="";var t=document.createElement("div");t.style.cssText="margin-bottom:14px;color:#c9c9c9";t.textContent="Connecté en tant que @"+name();$("list").appendChild(t);var q=document.createElement("div");q.style.cssText="margin-bottom:14px";q.textContent="Abonnements : "+follows.size;$("list").appendChild(q);sb.from("follows").select("follower_id",{count:"exact",head:true}).eq("followed_id",me.id).then(function(r){q.textContent="Abonnés : "+(r.count||0)+" · Abonnements : "+follows.size});
  btn("Se déconnecter",function(){sb.auth.signOut();$("sheet").classList.remove("open")});
  btn("Supprimer mon compte",async function(){if(!confirm("Supprimer définitivement ton compte, tes vidéos, tes likes et tes commentaires ?"))return;var r=await sb.rpc("delete_my_account");if(r.error){toast("Suppression impossible");return}$("sheet").classList.remove("open");await sb.auth.signOut();toast("Compte supprimé")},true)}
 $("add").onclick=function(){$("file").click()};
