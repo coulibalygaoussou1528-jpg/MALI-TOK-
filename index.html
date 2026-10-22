@@ -55,6 +55,8 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--y);outline-offs
 .tabs .on{color:#fff;border-bottom-color:var(--y)}
 .fb{margin-left:8px;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.6);border-radius:6px;color:#fff;font-size:12px;padding:2px 8px;cursor:pointer;vertical-align:middle}
 .fb.on{background:none;opacity:.8}
+.legal{font-size:12px;color:#aaa;text-align:center;line-height:1.5}.legal a{color:var(--y)}
+.auth label{font-size:14px;color:#ddd}
 </style></head>
 <body>
 <div class="stage">
@@ -67,8 +69,10 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--y);outline-offs
     <input id="em" type="text" placeholder="Numéro de téléphone ou e-mail" autocomplete="username">
     <input id="pw" type="password" placeholder="Mot de passe (6 caractères minimum)" autocomplete="current-password">
     <div class="err" id="err"></div>
+    <label id="okl" style="display:none"><input type="checkbox" id="ok"> J’ai 13 ans ou plus</label>
     <button class="go" id="go">Se connecter</button>
     <button class="alt" id="alt">Pas de compte ? Créer un compte</button>
+    <div class="legal">En continuant, tu acceptes les <a href="conditions.html">conditions d’utilisation</a> et la <a href="confidentialite.html">politique de confidentialité</a>.</div>
   </div>
   <div class="sheet" id="sheet" role="dialog">
     <div class="sh"><span id="ttl"></span><button id="close" aria-label="Fermer">×</button></div>
@@ -83,19 +87,20 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--y);outline-offs
   <button id="me">Profil</button>
 </nav>
 <input type="file" id="file" accept="video/*" hidden>
+<input type="file" id="pfile" accept="image/*" hidden>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script>
 var sb=supabase.createClient("https://hcltfvxyglnfvivzazzy.supabase.co","sb_publishable_PDIeGRRwoe-9vKUvHEe4jQ_wb4LSKE9");
 var $=function(i){return document.getElementById(i)};
-var me=null,muted=true,mode="c",cur=null,pend=null,signup=false,tab="all",follows=new Set(),feed=$("feed");
+var me=null,muted=true,mode="c",cur=null,pend=null,signup=false,tab="all",follows=new Set(),avatars={},feed=$("feed");
 var ico={h:'<svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-9.6-9.4A5.6 5.6 0 0 1 12 6.2a5.6 5.6 0 0 1 9.6 5.4C19.5 16.4 12 21 12 21z"/></svg>',c:'<svg viewBox="0 0 24 24"><path d="M4 5h16v11H10l-5 4v-4H4z"/></svg>',s:'<svg viewBox="0 0 24 24"><path d="M4 13v7h16v-7M12 3v12M7 8l5-5 5 5"/></svg>',m:'<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>'};
 function toast(m){var t=$("toast");t.textContent=m;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(function(){t.classList.remove("show")},2200)}
 function name(){return (me&&me.user_metadata&&me.user_metadata.username)||"ami"}
 function fr(m){if(/Invalid login/i.test(m))return"Numéro, e-mail ou mot de passe incorrect.";if(/already registered/i.test(m))return"Ce numéro ou cet e-mail a déjà un compte. Connecte-toi.";if(/rate limit/i.test(m))return"Trop d’essais. Réessaie dans quelques minutes.";return m}
 function toLogin(v){if(v.indexOf("@")>-1)return v;var d=v.replace(/\D/g,"");if(d.length<8)return"";if(d.length===8)d="223"+d;return d+"@malitok.app"}
-$("alt").onclick=function(){signup=!signup;$("un").style.display=signup?"block":"none";$("go").textContent=signup?"Créer mon compte":"Se connecter";this.textContent=signup?"Déjà un compte ? Se connecter":"Pas de compte ? Créer un compte";$("err").textContent=""};
+$("alt").onclick=function(){signup=!signup;$("un").style.display=signup?"block":"none";$("okl").style.display=signup?"block":"none";$("go").textContent=signup?"Créer mon compte":"Se connecter";this.textContent=signup?"Déjà un compte ? Se connecter":"Pas de compte ? Créer un compte";$("err").textContent=""};
 $("go").onclick=async function(){var e=toLogin($("em").value.trim()),p=$("pw").value,u=$("un").value.trim();$("err").textContent="";
- if(!e||p.length<6||(signup&&u.length<2)){$("err").textContent=signup?"Remplis ton nom, ton numéro de téléphone (ou e-mail) et un mot de passe de 6 caractères minimum.":"Entre ton numéro de téléphone (ou e-mail) et ton mot de passe (6 caractères minimum).";return}
+ if(signup&&!$("ok").checked){$("err").textContent="Confirme que tu as 13 ans ou plus.";return}if(!e||p.length<6||(signup&&u.length<2)){$("err").textContent=signup?"Remplis ton nom, ton numéro de téléphone (ou e-mail) et un mot de passe de 6 caractères minimum.":"Entre ton numéro de téléphone (ou e-mail) et ton mot de passe (6 caractères minimum).";return}
  this.disabled=true;
  var r=signup?await sb.auth.signUp({email:e,password:p,options:{data:{username:u}}}):await sb.auth.signInWithPassword({email:e,password:p});
  this.disabled=false;
@@ -108,6 +113,7 @@ async function load(){
  if(r.error){toast("Chargement impossible");return}
  var B=(await sb.from("blocks").select("blocked_id")).data||[];r.data=r.data.filter(function(p){return !B.some(function(b){return b.blocked_id===p.user_id})});
  var F=(await sb.from("follows").select("followed_id")).data||[];follows=new Set(F.map(function(x){return x.followed_id}));if(tab==="sub")r.data=r.data.filter(function(p){return follows.has(p.user_id)});
+ var PR=r.data.length?((await sb.from("profiles").select("user_id,avatar_url").in("user_id",r.data.map(function(p){return p.user_id}))).data||[]):[];avatars={};PR.forEach(function(x){avatars[x.user_id]=x.avatar_url});
  var ids=r.data.map(function(p){return p.id}),L=[],C=[];
  if(ids.length){L=(await sb.from("likes").select("post_id,user_id").in("post_id",ids)).data||[];C=(await sb.from("comments").select("post_id").in("post_id",ids)).data||[]}
  feed.innerHTML="";io.disconnect();
@@ -116,7 +122,7 @@ async function load(){
 function mk(p){
  var d=document.createElement("div");d.className="post";
  var v=document.createElement("video");v.className="bg";v.src=p.video_url;v.loop=true;v.playsInline=true;v.muted=true;v.preload="metadata";v.onclick=function(){v.paused?v.play():v.pause()};d.appendChild(v);
- var i=document.createElement("div");i.className="info";var u=document.createElement("b");u.textContent="@"+p.username;if(p.user_id!==me.id){var fb=document.createElement("button");fb.className="fb";fb.dataset.u=p.user_id;fb.onclick=function(){toggleFollow(p.user_id,p.username)};u.appendChild(fb)}var c=document.createElement("span");c.textContent=p.caption||"";i.appendChild(u);i.appendChild(c);d.appendChild(i);
+ var i=document.createElement("div");i.className="info";var u=document.createElement("b");u.textContent="@"+p.username;if(p.user_id!==me.id){var fb=document.createElement("button");fb.className="fb";fb.dataset.u=p.user_id;fb.onclick=function(){toggleFollow(p.user_id,p.username)};u.appendChild(fb)}var c=document.createElement("span");c.textContent=p.caption||"";u.insertBefore(avEl(p.user_id,p.username,30),u.firstChild);i.appendChild(u);i.appendChild(c);d.appendChild(i);
  var r=document.createElement("div");r.className="rail";
  var lb=document.createElement("button"),cb=document.createElement("button"),sb2=document.createElement("button");
  lb.setAttribute("aria-label","J’aime");cb.setAttribute("aria-label","Commentaires");sb2.setAttribute("aria-label","Partager");
@@ -161,6 +167,16 @@ $("inp").addEventListener("keydown",function(e){if(e.key==="Enter")$("send").cli
 $("snd").onclick=function(){muted=!muted;this.textContent=muted?"Son coupé":"Son activé";feed.querySelectorAll("video").forEach(function(v){v.muted=muted})};
 $("home").onclick=function(){load();feed.scrollTo({top:0,behavior:"smooth"})};
 $("me").onclick=function(){open("u",null,null)};
+function avEl(id,nm,sz){var a=document.createElement("span");a.style.cssText="display:inline-block;vertical-align:middle;margin-right:8px;width:"+sz+"px;height:"+sz+"px;border-radius:50%;background:#444 center/cover no-repeat;text-align:center;line-height:"+sz+"px;font-size:"+Math.round(sz*.5)+"px;overflow:hidden";var u=avatars[id];if(u){a.style.backgroundImage='url("'+encodeURI(u)+'")'}else{a.textContent=(nm||"?").charAt(0).toUpperCase()}return a}
+$("pfile").onchange=async function(){var f=this.files[0];this.value="";if(!f)return;if(f.type.indexOf("image")!==0){toast("Choisis une image");return}
+ toast("Envoi de la photo…");
+ try{var bmp=await createImageBitmap(f);var s=Math.min(bmp.width,bmp.height),c=document.createElement("canvas");c.width=c.height=256;c.getContext("2d").drawImage(bmp,(bmp.width-s)/2,(bmp.height-s)/2,s,s,0,0,256,256);
+  var blob=await new Promise(function(ok){c.toBlob(ok,"image/jpeg",.85)});
+  var path=me.id+"/"+Date.now()+".jpg";var u=await sb.storage.from("avatars").upload(path,blob,{contentType:"image/jpeg"});if(u.error)throw u.error;
+  var url=sb.storage.from("avatars").getPublicUrl(path).data.publicUrl,old=avatars[me.id];
+  var r=await sb.from("profiles").upsert({user_id:me.id,username:name(),avatar_url:url});if(r.error)throw r.error;
+  avatars[me.id]=url;if(old){var i=old.indexOf("/avatars/");if(i>-1)sb.storage.from("avatars").remove([old.slice(i+9)])}
+  toast("Photo mise à jour");profile();load()}catch(e){toast("Photo impossible")}};
 function fbUpdate(){document.querySelectorAll(".fb").forEach(function(b){var f=follows.has(b.dataset.u);b.textContent=f?"Abonné":"S’abonner";b.className=f?"fb on":"fb"})}
 async function toggleFollow(id,nm){var was=follows.has(id);if(was)follows.delete(id);else follows.add(id);fbUpdate();
  var r=was?await sb.from("follows").delete().match({follower_id:me.id,followed_id:id}):await sb.from("follows").insert({followed_id:id});
@@ -177,9 +193,14 @@ async function block(p){if(!confirm("Bloquer @"+p.username+" ? Tu ne verras plus
 async function delPost(p){if(!confirm("Supprimer cette vidéo définitivement ?"))return;var r=await sb.from("posts").delete().eq("id",p.id);$("sheet").classList.remove("open");if(r.error){toast("Suppression impossible");return}
  try{var i=p.video_url.indexOf("/videos/");if(i>-1)await sb.storage.from("videos").remove([decodeURIComponent(p.video_url.slice(i+8))])}catch(e){}
  toast("Vidéo supprimée");load()}
-function profile(){$("ttl").textContent="Mon compte";$("list").innerHTML="";var t=document.createElement("div");t.style.cssText="margin-bottom:14px;color:#c9c9c9";t.textContent="Connecté en tant que @"+name();$("list").appendChild(t);var q=document.createElement("div");q.style.cssText="margin-bottom:14px";q.textContent="Abonnements : "+follows.size;$("list").appendChild(q);sb.from("follows").select("follower_id",{count:"exact",head:true}).eq("followed_id",me.id).then(function(r){q.textContent="Abonnés : "+(r.count||0)+" · Abonnements : "+follows.size});
+function profile(){$("ttl").textContent="Mon compte";$("list").innerHTML="";var av=avEl(me.id,name(),72);av.style.display="block";av.style.margin="0 0 12px";$("list").appendChild(av);
+ sb.from("profiles").select("avatar_url").eq("user_id",me.id).maybeSingle().then(function(r){if(r.data&&r.data.avatar_url){avatars[me.id]=r.data.avatar_url;av.textContent="";av.style.backgroundImage='url("'+encodeURI(r.data.avatar_url)+'")'}});var t=document.createElement("div");t.style.cssText="margin-bottom:14px;color:#c9c9c9";t.textContent="Connecté en tant que @"+name();$("list").appendChild(t);var q=document.createElement("div");q.style.cssText="margin-bottom:14px";q.textContent="Abonnements : "+follows.size;$("list").appendChild(q);sb.from("follows").select("follower_id",{count:"exact",head:true}).eq("followed_id",me.id).then(function(r){q.textContent="Abonnés : "+(r.count||0)+" · Abonnements : "+follows.size});
+ btn("Changer ma photo de profil",function(){$("pfile").click()});
  btn("Se déconnecter",function(){sb.auth.signOut();$("sheet").classList.remove("open")});
- btn("Supprimer mon compte",async function(){if(!confirm("Supprimer définitivement ton compte, tes vidéos, tes likes et tes commentaires ?"))return;var r=await sb.rpc("delete_my_account");if(r.error){toast("Suppression impossible");return}$("sheet").classList.remove("open");await sb.auth.signOut();toast("Compte supprimé")},true)}
+ btn("Conditions d’utilisation",function(){window.open("conditions.html","_blank")});
+ btn("Politique de confidentialité",function(){window.open("confidentialite.html","_blank")});
+ btn("Supprimer mon compte",async function(){if(!confirm("Supprimer définitivement ton compte, tes vidéos, tes likes et tes commentaires ?"))return;try{var pr=await sb.from("posts").select("video_url").eq("user_id",me.id);var ps=(pr.data||[]).map(function(x){var i=x.video_url.indexOf("/videos/");return i>-1?decodeURIComponent(x.video_url.slice(i+8)):null}).filter(Boolean);if(ps.length)await sb.storage.from("videos").remove(ps);var ao=avatars[me.id];if(ao){var j=ao.indexOf("/avatars/");if(j>-1)await sb.storage.from("avatars").remove([ao.slice(j+9)])}}catch(e){}
+  var r=await sb.rpc("delete_my_account");if(r.error){toast("Suppression impossible");return}$("sheet").classList.remove("open");await sb.auth.signOut();toast("Compte supprimé")},true)}
 $("add").onclick=function(){$("file").click()};
 $("file").onchange=function(){var f=this.files[0];this.value="";if(!f)return;
  if(f.type&&f.type.indexOf("video")!==0){toast("Choisis un fichier vidéo");return}
