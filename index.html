@@ -58,7 +58,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--y);outline-offs
   <div class="auth" id="auth">
     <div class="logo"><i>MALI</i><em></em><u>TOK</u></div>
     <input id="un" placeholder="Ton nom d’utilisateur" maxlength="20" style="display:none" autocomplete="username">
-    <input id="em" type="email" placeholder="E-mail" autocomplete="email">
+    <input id="em" type="text" placeholder="Numéro de téléphone ou e-mail" autocomplete="username">
     <input id="pw" type="password" placeholder="Mot de passe (6 caractères minimum)" autocomplete="current-password">
     <div class="err" id="err"></div>
     <button class="go" id="go">Se connecter</button>
@@ -85,10 +85,11 @@ var me=null,muted=true,mode="c",cur=null,pend=null,signup=false,feed=$("feed");
 var ico={h:'<svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-9.6-9.4A5.6 5.6 0 0 1 12 6.2a5.6 5.6 0 0 1 9.6 5.4C19.5 16.4 12 21 12 21z"/></svg>',c:'<svg viewBox="0 0 24 24"><path d="M4 5h16v11H10l-5 4v-4H4z"/></svg>',s:'<svg viewBox="0 0 24 24"><path d="M4 13v7h16v-7M12 3v12M7 8l5-5 5 5"/></svg>'};
 function toast(m){var t=$("toast");t.textContent=m;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(function(){t.classList.remove("show")},2200)}
 function name(){return (me&&me.user_metadata&&me.user_metadata.username)||"ami"}
-function fr(m){if(/Invalid login/i.test(m))return"E-mail ou mot de passe incorrect.";if(/already registered/i.test(m))return"Cet e-mail a déjà un compte. Connecte-toi.";if(/rate limit/i.test(m))return"Trop d’essais. Réessaie dans quelques minutes.";return m}
+function fr(m){if(/Invalid login/i.test(m))return"Numéro, e-mail ou mot de passe incorrect.";if(/already registered/i.test(m))return"Ce numéro ou cet e-mail a déjà un compte. Connecte-toi.";if(/rate limit/i.test(m))return"Trop d’essais. Réessaie dans quelques minutes.";return m}
+function toLogin(v){if(v.indexOf("@")>-1)return v;var d=v.replace(/\D/g,"");if(d.length<8)return"";if(d.length===8)d="223"+d;return d+"@malitok.app"}
 $("alt").onclick=function(){signup=!signup;$("un").style.display=signup?"block":"none";$("go").textContent=signup?"Créer mon compte":"Se connecter";this.textContent=signup?"Déjà un compte ? Se connecter":"Pas de compte ? Créer un compte";$("err").textContent=""};
-$("go").onclick=async function(){var e=$("em").value.trim(),p=$("pw").value,u=$("un").value.trim();$("err").textContent="";
- if(!e||p.length<6||(signup&&u.length<2)){$("err").textContent=signup?"Remplis ton nom, ton e-mail et un mot de passe de 6 caractères minimum.":"Entre ton e-mail et ton mot de passe (6 caractères minimum).";return}
+$("go").onclick=async function(){var e=toLogin($("em").value.trim()),p=$("pw").value,u=$("un").value.trim();$("err").textContent="";
+ if(!e||p.length<6||(signup&&u.length<2)){$("err").textContent=signup?"Remplis ton nom, ton numéro de téléphone (ou e-mail) et un mot de passe de 6 caractères minimum.":"Entre ton numéro de téléphone (ou e-mail) et ton mot de passe (6 caractères minimum).";return}
  this.disabled=true;
  var r=signup?await sb.auth.signUp({email:e,password:p,options:{data:{username:u}}}):await sb.auth.signInWithPassword({email:e,password:p});
  this.disabled=false;
