@@ -47,10 +47,13 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--y);outline-offs
 .auth .go:disabled{opacity:.5}
 .auth .alt{background:none;border:0;color:var(--y);font-size:14px;cursor:pointer;padding:6px}
 .err{color:#ff7b7b;font-size:14px;min-height:20px;text-align:center}
+.rt{display:flex;gap:8px;pointer-events:auto}
+.snd{position:relative}
+.bn{position:absolute;top:-5px;right:-5px;min-width:17px;height:17px;border-radius:9px;background:var(--r);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px}
 </style></head>
 <body>
 <div class="stage">
-  <div class="top"><div class="logo"><i>MALI</i><em></em><u>TOK</u></div><button class="snd" id="snd">Son coupé</button></div>
+  <div class="top"><div class="logo"><i>MALI</i><em></em><u>TOK</u></div><div class="rt"><button class="snd" id="bell" aria-label="Notifications">🔔<span class="bn" id="bn" style="display:none">0</span></button><button class="snd" id="snd">Son coupé</button></div></div>
   <div class="feed" id="feed"></div>
   <div class="auth" id="auth">
     <div class="logo"><i>MALI</i><em></em><u>TOK</u></div>
@@ -91,7 +94,7 @@ $("go").onclick=async function(){var e=$("em").value.trim(),p=$("pw").value,u=$(
  this.disabled=false;
  if(r.error){$("err").textContent=fr(r.error.message);return}
  if(!r.data.session){$("err").textContent="Compte créé. Vérifie ton e-mail, puis connecte-toi."}};
-sb.auth.onAuthStateChange(function(ev,s){me=s?s.user:null;$("auth").style.display=me?"none":"flex";if(me)setTimeout(load,0)});
+sb.auth.onAuthStateChange(function(ev,s){me=s?s.user:null;$("auth").style.display=me?"none":"flex";if(me)setTimeout(function(){load();badge()},0)});
 var io=new IntersectionObserver(function(es){es.forEach(function(e){var v=e.target.querySelector("video");if(!v)return;if(e.isIntersecting){v.muted=muted;v.play().catch(function(){})}else{v.pause()}})},{root:feed,threshold:.7});
 async function load(){
  var r=await sb.from("posts").select("*").order("created_at",{ascending:false}).limit(30);
@@ -116,7 +119,7 @@ function mk(p){
  cb.onclick=function(){open("c",p,draw)};
  sb2.onclick=function(){var data={title:"MALI TOK",text:p.caption||"Regarde cette vidéo sur MALI TOK",url:location.href};if(navigator.share){navigator.share(data).catch(function(){})}else{try{navigator.clipboard.writeText(location.href).then(function(){toast("Lien copié")})}catch(e){toast("Copie impossible")}}};
  r.appendChild(lb);r.appendChild(cb);r.appendChild(sb2);d.appendChild(r);io.observe(d);return d}
-function open(m,p,draw){mode=m;cur={p:p,draw:draw};$("inp").value="";$("sheet").classList.add("open");
+function open(m,p,draw){mode=m;cur={p:p,draw:draw};$("inp").value="";$("sheet").classList.add("open");document.querySelector(".add-c").style.display=m==="n"?"none":"flex";if(m==="n"){$("ttl").textContent="Notifications";notifs();return}
  if(m==="c"){$("ttl").textContent="Commentaires";$("inp").placeholder="Ajoute un commentaire…";$("send").textContent="Envoyer";comments()}
  else{$("ttl").textContent="Nouvelle vidéo";$("inp").placeholder="Écris une légende (facultatif)";$("send").textContent="Publier";$("list").textContent="Vidéo choisie : "+pend.name+" ("+(pend.size/1048576).toFixed(1)+" Mo)"}}
 async function comments(){var l=$("list");l.textContent="Chargement…";var r=await sb.from("comments").select("username,body").eq("post_id",cur.p.id).order("created_at");
@@ -124,6 +127,14 @@ async function comments(){var l=$("list");l.textContent="Chargement…";var r=aw
  l.innerHTML="";if(!r.data.length){l.textContent="Aucun commentaire. Écris le premier.";return}
  r.data.forEach(function(k){var x=document.createElement("div");x.className="c";var b=document.createElement("b");b.textContent="@"+k.username+" ";x.appendChild(b);x.appendChild(document.createTextNode(k.body));l.appendChild(x)});l.scrollTop=l.scrollHeight}
 $("close").onclick=function(){$("sheet").classList.remove("open")};
+async function badge(){if(!me)return;var r=await sb.from("notifications").select("id",{count:"exact",head:true}).eq("read",false);var n=r.count||0;$("bn").textContent=n>9?"9+":n;$("bn").style.display=n?"flex":"none"}
+async function notifs(){var l=$("list");l.textContent="Chargement…";var r=await sb.from("notifications").select("actor_name,kind,body,read").order("created_at",{ascending:false}).limit(30);
+ if(r.error){l.textContent="Chargement impossible.";return}
+ l.innerHTML="";if(!r.data.length){l.textContent="Aucune notification pour l’instant.";return}
+ r.data.forEach(function(k){var x=document.createElement("div");x.className="c";var b=document.createElement("b");b.textContent=(k.read?"":"● ")+"@"+k.actor_name+" ";x.appendChild(b);x.appendChild(document.createTextNode(k.kind==="like"?"a aimé ta vidéo":"a commenté : "+(k.body||"")));l.appendChild(x)});
+ await sb.from("notifications").update({read:true}).eq("read",false);badge()}
+$("bell").onclick=function(){open("n",null,null)};
+setInterval(badge,30000);
 $("send").onclick=async function(){var t=$("inp").value.trim(),b=this;
  if(mode==="c"){if(!t){toast("Écris un commentaire d’abord");return}b.disabled=true;
   var r=await sb.from("comments").insert({post_id:cur.p.id,username:name(),body:t});b.disabled=false;
